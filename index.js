@@ -32,58 +32,95 @@ const photoUrls = [
   "https://i.postimg.cc/VNk697tt/IMG-20250430-002842-900.jpg",
 ];
 
+
 // Фейковые ссылки с названиями
 const fakeLinks = [
-    { title: "Ответы COP", url: "https://t.me/test_uz_ru/11908" },
-    { title: "Ответы СОЧ", url: "https://t.me/test_uz_ru/11214" },
-    { title: "Сайт(Test_uz_ru)", url: "https://www.test-uz.ru/" },
-    { title: "Cerebry", url: "https://m.student.cerebry.co/" },
-  ];
-  
-  // Обработка команды /start
-  bot.start(async (ctx) => {
-    const userId = ctx.from.id;
-    const messageText = ctx.message.text.trim();
-    const parts = messageText.split(" ");
-    console.log(userId);
-  
-    // Пример: /start 10
-    if (
-      allowedUsers.includes(userId) &&
-      parts.length === 2 &&
-      /^\d+$/.test(parts[1])
-    ) {
-      const numPhotos = parseInt(parts[1], 10);
-      let sent = 0;
-  
-      while (sent < numPhotos) {
-        try {
-          const photoUrl = photoUrls[sent % photoUrls.length];
-          await ctx.replyWithPhoto(photoUrl);
-          sent++;
-          await new Promise((res) => setTimeout(res, 500));
-        } catch (err) {
-          console.error("Ошибка отправки фото:", err);
-          await new Promise((res) => setTimeout(res, 1000));
-        }
+  { title: "Ответы COP", url: "https://t.me/test_uz_ru/11908" },
+  { title: "Ответы СОЧ", url: "https://t.me/test_uz_ru/11214" },
+  { title: "Сайт(Test_uz_ru)", url: "https://www.test-uz.ru/" },
+  { title: "Cerebry", url: "https://m.student.cerebry.co/" },
+];
+
+// Команда /start
+bot.start(async (ctx) => {
+  const userId = ctx.from.id;
+  const messageText = ctx.message.text.trim();
+  const parts = messageText.split(" ");
+  console.log(userId);
+
+  if (
+    allowedUsers.includes(userId) &&
+    parts.length === 2 &&
+    /^\d+$/.test(parts[1])
+  ) {
+    const numPhotos = parseInt(parts[1], 10);
+
+    await ctx.reply(`Начинаю отправку ${numPhotos} фото...`);
+
+    let sent = 0;
+
+    const interval = setInterval(async () => {
+      if (sent >= numPhotos) {
+        clearInterval(interval);
+        return;
       }
+
+      try {
+        const photoUrl = photoUrls[sent % photoUrls.length];
+        await ctx.telegram.sendPhoto(ctx.chat.id, photoUrl);
+        sent++;
+      } catch (err) {
+        console.error("Ошибка при отправке фото:", err);
+      }
+    }, 400); // каждые 400 мс
+  } else {
+    try {
+      const buttons = fakeLinks.map(({ title, url }) =>
+        [Markup.button.url(title, url)]
+      );
+
+      await ctx.reply(
+        "Для получения информации выберите нужный ресурс:",
+        Markup.inlineKeyboard(buttons)
+      );
+    } catch (err) {
+      console.error("Ошибка при отправке ссылок с кнопками:", err);
+    }
+  }
+});
+
+
+// Команда /id <номер> <количество>
+bot.command("id", async (ctx) => {
+  const userId = ctx.from.id;
+
+  if (!allowedUsers.includes(userId)) return;
+
+  const messageText = ctx.message.text.trim();
+  const parts = messageText.split(" ");
+
+  if (parts.length < 2 || !/^\d+$/.test(parts[1])) {
+    return ctx.reply("Формат: /id <номер> <кол-во (по умолчанию 1)>");
+  }
+
+  const index = parseInt(parts[1], 10);
+  const count = parts[2] && /^\d+$/.test(parts[2]) ? parseInt(parts[2], 10) : 1;
+
+  for (let i = 0; i < count; i++) {
+    const targetIndex = index + i;
+
+    if (targetIndex < 0 || targetIndex >= photoUrls.length) {
+      await ctx.reply(`Картинка с индексом ${targetIndex} не найдена.`);
     } else {
-        // Отправка всех ссылок сразу, с inline-кнопками
-        try {
-          const buttons = fakeLinks.map(({ title, url }) =>
-            [Markup.button.url(title, url)]
-          );
-      
-          await ctx.reply(
-            "Для получения информации выберите нужный ресурс:",
-            Markup.inlineKeyboard(buttons)
-          );
-        } catch (err) {
-          console.error("Ошибка при отправке ссылок с кнопками:", err);
-        }
+      try {
+        await ctx.replyWithPhoto(photoUrls[targetIndex]);
+        await new Promise((res) => setTimeout(res, 300));
+      } catch (err) {
+        console.error(`Ошибка при отправке фото №${targetIndex}:`, err);
       }
-  });
-  
+    }
+  }
+});
 
 // Запуск бота
 bot.launch();
